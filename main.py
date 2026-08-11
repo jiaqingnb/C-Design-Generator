@@ -1,94 +1,31 @@
 import sys
 
-
-from parser.file_loader import FileLoader
-
-from parser.ast_parser import ASTParser
-
-
-from analyzer.call_analyzer import CallAnalyzer
-
-from analyzer.variable_analyzer import VariableAnalyzer
-
-from analyzer.flow_analyzer import FlowAnalyzer
-
-from analyzer.io_analyzer import IOAnalyzer
-
-from analyzer.description_analyzer import DescriptionAnalyzer
-
-from analyzer.global_variable_analyzer import GlobalVariableAnalyzer
-
-
-from generator.markdown_generator import MarkdownGenerator
-
-from generator.plantuml_generator import PlantUMLGenerator
-
-from generator.docx_generator import DocxGenerator
-
-from generator.com_renderer import ComVsdxRenderer, ComRendererError
+import pipeline
 
 
 if __name__ == "__main__":
 
-    filename = sys.argv[1]
-
-
-    loader = FileLoader()
-
-
-    code = loader.load(filename)
-
-
-    parser = ASTParser()
-
-
-    cfile = parser.parse(code)
-
-
-    analyzers = [
-        CallAnalyzer(),
-        VariableAnalyzer(),
-        FlowAnalyzer(),
-        IOAnalyzer(),
-        DescriptionAnalyzer(),
-        GlobalVariableAnalyzer(cfile.globals)
-    ]
-
-
-    for func in cfile.functions:
-
-        for analyzer in analyzers:
-            analyzer.analyze(func)
-
-
-    md = MarkdownGenerator()
-    md.generate(cfile, "output/design.md")
-
-
-    docx_gen = DocxGenerator()
-    docx_gen.generate(cfile, "output/design.docx")
-
-
-    puml = PlantUMLGenerator()
-    puml.generate_call_graph(cfile.functions)
-
-    for func in cfile.functions:
-        puml.generate_flow(func)
-
-
-    # Visio 流程图：通过 COM 渲染调用本机 Visio 绘制（含原生连线）。
-    try:
-        com_renderer = ComVsdxRenderer(output_dir="output")
-        com_renderer.generate(cfile, "output/design.vsdx", export_png=True)
-    except ComRendererError as exc:
-        print("依赖环境未安装完毕不可使用")
-        print("  详情: %s" % exc)
-        print("  请先安装 Microsoft Visio 桌面版，并执行：pip install pywin32")
+    if len(sys.argv) < 2:
+        print("用法: python main.py <source.c> [输出基目录，默认 output/]")
         sys.exit(1)
 
+    filename = sys.argv[1]
+    base_dir = sys.argv[2] if len(sys.argv) > 2 else "output"
 
-    print("V6 COMPLETE  (functions: %d, structs: %d, enums: %d, docx: design.docx, vsdx: design.vsdx)" % (
-        len(cfile.functions),
-        len(cfile.structs),
-        len(cfile.enums),
+    try:
+        result = pipeline.generate_design(filename, base_dir=base_dir)
+    except RuntimeError as exc:
+        print("错误: %s" % exc)
+        sys.exit(1)
+
+    vsdx_value = result["design_vsdx"] or "<Visio 不可用>"
+    if result["design_vsdx"] is None:
+        print("提示: 未生成 .vsdx，请先安装 Microsoft Visio 桌面版，并执行: pip install pywin32")
+
+    print("V6.1 COMPLETE  (functions: %d, structs: %d, enums: %d, docx: %s, vsdx: %s)" % (
+        result["functions"],
+        result["structs"],
+        result["enums"],
+        result["design_docx"],
+        vsdx_value,
     ))

@@ -26,9 +26,7 @@ from __future__ import annotations
 
 import os
 import sys
-import tempfile
 import zipfile
-from pathlib import Path
 
 try:
     import win32com.client
@@ -86,10 +84,24 @@ class ComVsdxRenderer:
         self.output_dir = os.path.abspath(output_dir)
         os.makedirs(self.output_dir, exist_ok=True)
         if template_dir is None:
-            here = os.path.dirname(os.path.abspath(__file__))
-            template_dir = os.path.join(here, "..", "templates", "vsdx_model")
+            template_dir = self._default_template_dir()
         self.template_dir = os.path.abspath(template_dir)
         self._masters = {}
+
+    @staticmethod
+    def _default_template_dir():
+        """定位 templates/vsdx_model 模板目录。
+
+        兼容两种运行环境：
+          - 源码运行：模板在工程内 templates/ 下，按 __file__ 相对定位。
+          - PyInstaller 打包：模板被打进 _MEIPASS 临时解压目录，
+            需用 sys._MEIPASS 定位，否则打包后找不到模板。
+        """
+        if getattr(sys, "frozen", False):  # PyInstaller 打包后的 exe
+            base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(sys.executable)))
+            return os.path.join(base, "templates", "vsdx_model")
+        here = os.path.dirname(os.path.abspath(__file__))
+        return os.path.join(here, "..", "templates", "vsdx_model")
 
     # ---------- 生命周期 ----------
 
@@ -505,15 +517,3 @@ class ComVsdxRenderer:
         if name in ("Decision", "判定"):
             return "diamond"
         return "rect"
-
-
-# ---------- 便捷入口 ----------
-
-def render_with_com(cfile, filename, template_dir=None, export_png=False):
-    """一行调用：用 COM 渲染器生成 VSDX。返回是否成功。
-
-    generate() 内部会自动 start/stop，因此这里无需重复管理生命周期。
-    """
-    renderer = ComVsdxRenderer(template_dir=template_dir,
-                               output_dir=os.path.dirname(os.path.abspath(filename)) or "output")
-    return renderer.generate(cfile, filename, export_png=export_png)

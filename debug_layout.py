@@ -14,7 +14,6 @@
     python debug_layout.py test_simple.c
 """
 
-import os
 import sys
 
 from parser.file_loader import FileLoader

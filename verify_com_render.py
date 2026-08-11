@@ -17,7 +17,7 @@ import sys
 from parser.file_loader import FileLoader
 from parser.ast_parser import ASTParser
 
-from generator.com_renderer import ComVsdxRenderer, ComRendererError
+from generator.com_renderer import ComVsdxRenderer
 
 
 def main():

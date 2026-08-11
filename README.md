@@ -35,7 +35,7 @@
 ### 1. Python 依赖
 
 ```bash
-pip install tree-sitter tree-sitter-c python-docx pywin32
+pip install tree-sitter tree-sitter-c python-docx pywin32 PySide6
 ```
 
 | 包 | 用途 | 必装 |
@@ -43,6 +43,7 @@ pip install tree-sitter tree-sitter-c python-docx pywin32
 | `tree-sitter` + `tree-sitter-c` | C 语言 AST 解析（解析核心） | ✅ 必需 |
 | `python-docx` | 生成 Word 函数说明表 | ✅ 必需 |
 | `pywin32` | 调用本机 Visio COM 接口绘制连线 | ✅ 必需（COM 自动化调用） |
+| `PySide6` | GUI 界面（V6.1） | ✅ 使用 GUI 时必需 |
 | `vsdx` | 读取/校验 VSDX（仅开发调试用） | 可选 |
 
 ### 2. 软件
@@ -55,12 +56,23 @@ pip install tree-sitter tree-sitter-c python-docx pywin32
 
 ## 快速开始
 
+### 方式一：GUI（推荐，V6.1）
+
 ```bash
 cd py_pro
-python main.py test_simple.c
+python gui_main.py
 ```
 
-在 `output/` 目录生成：
+打开窗口后：把 `.c` 文件**拖进窗口**（或点「选择文件」），再点「**一键生成**」。产物按输入文件名放入独立文件夹，默认在 `output/<文件名>/` 下（可在界面里改输出基目录）。
+
+### 方式二：命令行
+
+```bash
+cd py_pro
+python main.py <你的源文件.c>
+```
+
+例如 `python main.py inner_udpcomm.c`，会在 `output/inner_udpcomm/` 目录生成：
 
 | 文件 | 说明 |
 |---|---|
@@ -71,6 +83,8 @@ python main.py test_simple.c
 | `design_p1.png` … | 各页 PNG 预览 |
 
 > 用 Visio 打开 `design.vsdx` 即可查看和继续编辑流程图。
+>
+> 命令行也支持指定输出基目录：`python main.py test.c my_out`（产物进 `my_out/test/`）。
 
 ### 输入文件编码
 
@@ -80,7 +94,13 @@ python main.py test_simple.c
 
 ```
 py_pro/
-├── main.py                    # 入口：解析 → 分析 → 生成
+├── main.py                    # CLI 入口：解析 → 分析 → 生成
+├── gui_main.py                # GUI 入口（V6.1，PySide6：拖拽 + 一键生成）
+├── pipeline.py                # 生成流水线封装（CLI/GUI 共用，按文件名建输出文件夹）
+├── gui.spec                   # PyInstaller 打包配置
+├── build.bat                  # Windows 一键打包脚本
+├── debug_layout.py            # 调试：打印布局明细（不依赖 Visio）
+├── verify_com_render.py       # 调试：仅验证 COM 渲染
 ├── parser/                    # 解析层（tree-sitter）
 │   ├── file_loader.py         # 读取文件 + 编码归一化（UTF-8/GBK）
 │   └── ast_parser.py          # AST 解析：函数/struct/enum/流程树
@@ -91,6 +111,7 @@ py_pro/
 │   ├── flow_analyzer.py       # 流程摘要与结构统计
 │   ├── global_variable_analyzer.py  # 全局变量引用/修改
 │   ├── io_analyzer.py         # 输入输出
+│   ├── description_analyzer.py # 功能描述
 │   └── variable_analyzer.py   # 局部变量
 ├── generator/                 # 生成层
 │   ├── docx_generator.py      # Word 函数说明表
@@ -100,19 +121,44 @@ py_pro/
 │   └── plantuml_generator.py  # PlantUML 图
 ├── templates/
 │   └── vsdx_model/            # Visio 官方流程图形状模板
-├── test_simple.c / test.c     # 测试用 C 文件
-└── output/                    # 生成结果
+└── output/                    # 生成结果（按文件名分子文件夹）
 ```
+
+> 提示：仓库不含示例 C 源文件（`output/` 下的 docx/vsdx/png 等是运行时生成，不入库）。
 
 ## 开发调试
 
 ```bash
 # 查看某函数在 Visio 中的布局明细（不依赖 Visio）
-python debug_layout.py test_simple.c
+python debug_layout.py <你的源文件.c>
 
 # 仅验证 COM 渲染（输出 VSDX + PNG 预览）
-python verify_com_render.py test_simple.c
+python verify_com_render.py <你的源文件.c>
 ```
+
+## 打包成 exe（可选）
+
+用 PyInstaller 把 GUI 打包成免 Python 环境的独立程序（文件夹模式）。
+
+```bash
+# 1. 安装 PyInstaller
+pip install pyinstaller
+
+# 2. 一键打包（Windows）
+#    在 PowerShell 里执行，或直接双击 build.bat
+.\build.bat
+```
+
+产物在 `dist/gui/` 文件夹：
+
+| 路径 | 说明 |
+|---|---|
+| `dist/gui/gui.exe` | 主程序，双击运行 |
+| `dist/gui/templates/` | Visio 模板（打包进去的） |
+
+把 `dist/gui` **整个文件夹**拷贝到目标机器即可运行，无需装 Python。注意：生成 Visio 流程图仍需要目标机器安装 Microsoft Visio 桌面版（COM 调用）。
+
+> 打包必须在你自己的 Windows 机器上进行（PyInstaller 不支持跨平台打包）。模板定位已做兼容处理（`com_renderer._default_template_dir` 支持 PyInstaller 的 `_MEIPASS` 解压目录）。
 
 ## 技术路线
 
